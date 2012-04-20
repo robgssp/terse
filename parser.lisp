@@ -9,17 +9,20 @@
 
 (defun parse-whitespace (stream)
   "Skips to the next statement counting newlines"
-  
+  (do ((char (peek-char nil stream nil nil) (peek-char nil stream nil nil)))
+      ((or (eql char nil) (not (whitespace-p char))))
+    (when (eql char #\Newline) (incf *current-line*))
+    (read-char stream nil nil)))
 
 (defun has-argument (stream)
   "Checks whether the previous command has an args list"
-  (eat-whitespace stream)
+  (parse-whitespace stream)
   (eql (peek-char t stream nil nil) #\.))
 
 ;; TODO: restructure
 (defun eat-additional-arguments (stream)
   "Returns comma-separated arguments after the initial one."
-  (eat-whitespace stream)
+  (parse-whitespace stream)
   (let ((next-char (peek-char nil stream nil nil)))
     (when (eql next-char #\,)
       (read-char stream)
@@ -27,7 +30,7 @@
 
 (defun parse-arguments (stream)
   "Returns a list of parsed arguments"
-  (eat-whitespace stream)
+  (parse-whitespace stream)
   (let ((next-char (peek-char nil stream nil nil)))
     (when (eql next-char #\.)
       (read-char stream)
@@ -62,7 +65,7 @@
 ;; endchar of NIL will end at end-of-file
 (defun parse-region (stream endchar)
   "Parses a region, ending at endchar"
-  (eat-whitespace stream)
+  (parse-whitespace stream)
   ;(unless (eql (peek-char nil stream nil nil) endchar)
   ;  (cons (parse stream) (parse-region stream endchar))))
   (prog1
@@ -72,12 +75,12 @@
                  #|(sleep .2)
                  (format t "Looking for ~a, got ~a~%" endchar char)|#)
          collecting (parse stream)
-         do (eat-whitespace stream))
+         do (parse-whitespace stream))
     (unless (eq endchar nil) (read-char stream nil nil))))
 
 (defun parse-variable (stream)
   "Parses a variable declaration/definition"
-  (read-char stream) (eat-whitespace stream)
+  (read-char stream) (parse-whitespace stream)
   (let ((name (eat-name stream)))
     (if (has-argument stream)
         (list :variable-set
@@ -88,7 +91,7 @@
 
 (defun parse-funcall (stream)
   "Parses a function call and its arguments"
-  (read-char stream) (eat-whitespace stream)
+  (read-char stream) (parse-whitespace stream)
   (let* ((name (eat-name stream))
          (ret (list :funcall (cons :name name))))
     (when (has-argument stream)
@@ -102,15 +105,15 @@
 
 (defun parse-defun (stream)
   "Parses a function definition"
-  (read-char stream) (eat-whitespace stream)
+  (read-char stream) (parse-whitespace stream)
   (let ((ret (list :defun
                    (cons :name (eat-name stream)))))
-    (eat-whitespace stream)
+    (parse-whitespace stream)
     (nconc ret (list (cons :body (parse-block stream))))))
 
 (defun parse-if-statement (stream)
   "Parses an if statement and its associated block"
-  (read-char stream) (eat-whitespace stream)
+  (read-char stream) (parse-whitespace stream)
   (list :if
         (cons :test (parse stream))
         (cons :body (parse-block stream))))
@@ -141,8 +144,9 @@
 
 (defun parse (stream)
   "Dispatch function for all the other parsing funcs"
-  (eat-whitespace stream)
+  (parse-whitespace stream)
   (let ((char (char-downcase (peek-char nil stream nil nil))))
+    (format t "Ate a ~a~%" char)
     (case char
          (#\f (parse-defun stream))
          (#\v (parse-variable stream))
@@ -156,7 +160,8 @@
          (t
           (cond
             ((digit-char-p char)
-             (parse-number stream)))))))
+             (parse-number stream))
+            (t (error (format nil "Parse failed at line ~a" *current-line*))))))))
 
 (defun parse-stream (stream)
   "The top-level parsing function"

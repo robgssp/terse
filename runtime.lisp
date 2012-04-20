@@ -36,8 +36,9 @@ if the binding already exists."
   ((value :initarg :value :accessor value))
   (:documentation "container for all Terse values"))
 
-(defun eval-statement (statement)
-  (if (eql 
+;(defun eval-statement (statement)
+;  (case (car statement)
+;    (
 
 (defun eval-list (list)
   (let ((res ()))
