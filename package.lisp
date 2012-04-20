@@ -1,0 +1,2 @@
+(defpackage terse
+  (:use :cl))
