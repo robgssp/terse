@@ -1,5 +1,13 @@
 (in-package :terse)
 
-(defun test ()
-  (with-open-file (file (merge-pathnames "test.ts") :direction :input)
-    (parse-stream file)))
+;;; Top-level
+
+(declaim (optimize (debug 3) (safety 3)))
+
+(defun test-parse (filename)
+  (with-open-file (f (parse-namestring filename))
+    (parse-stream f)))
+
+(defun main (filename)
+  (with-open-file (f (parse-namestring filename))
+    (funcall (compile (parse-stream f)))))

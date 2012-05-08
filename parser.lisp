@@ -2,24 +2,29 @@
 
 ;;; Parser functions
 
+(declaim (optimize (debug 3) (safety 3)))
+
 (defvar *parse-tree* ()
   "The parse tree of the target program")
 
 (defvar *current-line* 1)
 
+(defun skip-comment (stream)
+  (peek-char #\Newline stream nil nil))
+
 (defun parse-whitespace (stream)
-  "Skips to the next statement counting newlines"
+  "Skips to the next statement counting newlines, returns next non-whitespace char"
   (do ((char (peek-char nil stream nil nil) (peek-char nil stream nil nil)))
-      ((or (eql char nil) (not (whitespace-p char))))
+      ((or (eql char nil) (not (or (eql char #\#) (whitespace-p char)))) char)
     (when (eql char #\Newline) (incf *current-line*))
+    (when (eql char #\#) (skip-comment stream))
     (read-char stream nil nil)))
 
 (defun has-argument (stream)
   "Checks whether the previous command has an args list"
-  (parse-whitespace stream)
-  (eql (peek-char t stream nil nil) #\.))
+  (eql (parse-whitespace stream) #\.))
 
-;; TODO: restructure
+;; TODO: remove code duplication
 (defun eat-additional-arguments (stream)
   "Returns comma-separated arguments after the initial one."
   (parse-whitespace stream)
@@ -53,8 +58,8 @@
 (defun parse-number (stream)
   "Parses a numeric value"
   (let ((res 0))
-    (loop (let ((char (peek-char nil stream)))
-            (if (digit-char-p char)
+    (loop (let ((char (peek-char nil stream nil nil)))
+            (if (and (characterp char) (digit-char-p char))
                 (setf res (+ (* res 10)
                              (char-to-num (read-char stream))))
                 (return))))
@@ -66,22 +71,27 @@
 (defun parse-region (stream endchar)
   "Parses a region, ending at endchar"
   (parse-whitespace stream)
-  ;(unless (eql (peek-char nil stream nil nil) endchar)
-  ;  (cons (parse stream) (parse-region stream endchar))))
   (prog1
-      (loop for char = (peek-char nil stream nil nil)
-         while (prog1
-                   (not (eql char endchar))
-                 #|(sleep .2)
-                 (format t "Looking for ~a, got ~a~%" endchar char)|#)
-         collecting (parse stream)
-         do (parse-whitespace stream))
-    (unless (eq endchar nil) (read-char stream nil nil))))
+      (do ((char (peek-char nil stream nil nil)
+                 (peek-char nil stream nil nil))
+           (res nil))
+          ((eql char endchar) (cons :progn (nreverse res)))
+        (push (parse stream) res)
+        (parse-whitespace stream))
+    (unless (eql endchar nil) (read-char stream nil nil))))
+
+(defun parse-block (stream)
+  "Parses a nested code block from the stream"
+  (parse-whitespace stream)
+  (read-char stream)
+  (parse-region stream #\\))
 
 (defun parse-variable (stream)
   "Parses a variable declaration/definition"
   (read-char stream) (parse-whitespace stream)
-  (let ((name (eat-name stream)))
+  (let ((name (if (eql (peek-char nil stream) #\()
+                  (parse-parened stream)
+                  (eat-name stream))))
     (if (has-argument stream)
         (list :variable-set
               (cons :name name)
@@ -98,37 +108,48 @@
       (nconc ret (list (cons :args (parse-arguments stream)))))
     ret))
 
-(defun parse-block (stream)
-  "Parses a nested code block from the stream"
-  (read-char stream)
-  (parse-region stream #\\))
+(defun parse-defun-arguments (stream)
+  "Parses arguments for name binding"
+  (cons (eat-name stream)
+        (when (eql (parse-whitespace stream) #\,)
+          (read-char stream) ; ,
+          (parse-defun-arguments stream))))
 
 (defun parse-defun (stream)
   "Parses a function definition"
   (read-char stream) (parse-whitespace stream)
-  (let ((ret (list :defun
-                   (cons :name (eat-name stream)))))
-    (parse-whitespace stream)
-    (nconc ret (list (cons :body (parse-block stream))))))
+  (let ((ret (list :defun)))
+    (flet ((setprop (prop val)
+             (nconc ret (list (cons prop val)))))
+      (when (name-char-p (parse-whitespace stream))
+        (setprop :name (eat-name stream)))
+      (when (has-argument stream)
+        (read-char stream) ; the .
+        (setprop :args (parse-defun-arguments stream)))
+      (setprop :body (parse-block stream)))))
 
-(defun parse-if-statement (stream)
-  "Parses an if statement and its associated block"
-  (read-char stream) (parse-whitespace stream)
-  (list :if
-        (cons :test (parse stream))
-        (cons :body (parse-block stream))))
+(defun parse-if-body (stream)
+  "used by parse-if-statement and parse-else-statement"
+  (let ((ret (list :if
+                   (cons :test (parse stream))
+                   (cons :body (parse-block stream)))))
+    (when (eql (parse-whitespace stream) #\e)
+      (nconc ret (list (cons :else (parse-else-statement stream)))))
+    ret))
 
 (defun parse-else-statement (stream)
   "Parses an else statement and its associated block"
   (read-char stream)
   ; Check whether statement is else or else-if by checking
   ; whether the next thing is a block or not
-  (if (eql (peek-char t stream nil nil) #\\)
-      (list :else
-            (cons :body (parse-block stream)))
-      (list :else-if
-            (cons :test (parse stream))
-            (cons :body (parse-block stream)))))
+  (if (eql (parse-whitespace stream) #\\)
+      (parse-block stream)
+      (parse-if-body stream)))
+
+(defun parse-if-statement (stream)
+  "Parses an if statement and its associated block"
+  (read-char stream)
+  (parse-if-body stream))
 
 ;; Pretty simplistic atm, need to add quote escaping sometime in the future 
 (defun parse-string (stream)
@@ -139,30 +160,56 @@
     (make-array (length strlist) :initial-contents strlist
                 :adjustable t :element-type 'character)))
 
-(defun skip-comment (stream)
-  (peek-char #\Newline stream))
+(defun parse-array (stream)
+  (read-char stream) (parse-whitespace stream)
+  (let ((body (loop while (not (eql (peek-char nil stream) #\]))
+                 collect (parse stream) do (parse-whitespace stream))))
+    (prog1 (cons :array body) (read-char stream))))
+
+(defun parse-parened (stream)
+  "Parses a parenthesized stream"
+  (prog2 (read-char stream) (parse stream)
+    (parse-whitespace stream) (read-char stream)))
+
+(defun parse-while-statement (stream)
+  (read-char stream)
+  ; Checks whether the following statements are in argument-form (For loop)
+  ; or a single expr (While loop)
+  (if (eql (parse-whitespace stream) #\.)
+      (let ((args (parse-arguments stream)))
+        (destructuring-bind (init test step) args
+          (list :for (cons :init init) (cons :test test)
+                (cons :step step) (cons :body (parse-block stream)))))
+      (list :while (cons :test (parse stream))
+            (cons :body (parse-block stream)))))
 
 (defun parse (stream)
   "Dispatch function for all the other parsing funcs"
   (parse-whitespace stream)
-  (let ((char (char-downcase (peek-char nil stream nil nil))))
-    (format t "Ate a ~a~%" char)
+  (let ((char (peek-char nil stream nil nil)))
     (case char
          (#\f (parse-defun stream))
          (#\v (parse-variable stream))
          (#\c (parse-funcall stream))
          (#\i (parse-if-statement stream))
-         (#\e (parse-else-statement stream))
-         (#\# (skip-comment stream) (parse stream))
+         (#\w (parse-while-statement stream))
          (#\" (parse-string stream))
          (#\. (parse-arguments stream))
-         (nil nil)
+         (#\[ (parse-array stream))
+         (#\( (parse-parened stream))
          (t
           (cond
-            ((digit-char-p char)
+            ((eql char nil) nil)
+            ((and (characterp char) (digit-char-p char))
              (parse-number stream))
-            (t (error (format nil "Parse failed at line ~a" *current-line*))))))))
+            (t (error (format nil "Parse failed at line ~a: ~a"
+                              *current-line* char))))))))
 
 (defun parse-stream (stream)
   "The top-level parsing function"
+  (setf *current-line* 1)
   (setf *parse-tree* (parse-region stream nil)))
+
+(defun parse-from-string (string)
+  (with-input-from-string (s string)
+    (parse-stream s)))

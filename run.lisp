@@ -1,4 +1,9 @@
-(require "asdf")
-(asdf:load-system "terse")
+#!/usr/bin/sbcl --script
 
-(print (terse::test))
+(require 'asdf)
+(require 'terse)
+
+(defun main ()
+  (terse::main (elt sb-ext:*posix-argv* 1)))
+
+(main)

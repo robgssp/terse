@@ -1,2 +1,3 @@
 (defpackage terse
-  (:use :cl))
+  (:use :cl)
+  (:shadow :compile))

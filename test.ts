@@ -1,7 +1,1 @@
-vfoo.5.6
-
-fthing\ vbar.7 vbaz.4 \
-
-icgt.vfoo,7\cprint."Hi!"\e\cprint."Bye!"\a
-
-cthing.6
+vvar.[1 2 3]
