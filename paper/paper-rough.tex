@@ -1,0 +1,475 @@
+\documentclass[12pt]{article}
+\usepackage{setspace,mathtools,todonotes}
+\usepackage[margin=1in]{geometry}
+\doublespacing
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\bs}{\textbackslash}
+
+\begin{document}
+\listoftodos
+\section{Abstract}
+
+Of all the myriad problems to solve in the realm of programming,
+perhaps one of the most interesting is crafting a new programming
+language. Whereas many problems in computing revolve around using
+general tools to solve a specific problem, programming language design
+is one of the few areas in which the issue is creating a general and
+customizable base on which any problem can be solved. Furthermore,
+languages themselves are not all equivalent: different languages
+target different problems and can have other characteristics such as
+performance, code portability and distribution methods. While these
+factors are important, and can become driving concerns in business
+environments, most of the interesting aspects of language design are
+in the language itself. This paper will examine the components
+necessary in designing a programming language, and in the process will
+cover the design and implementation of my own language, Terse.
+
+\clearpage
+
+\section{On Languages in General}
+
+Programming languages, both in design and implementation, have a huge
+deal of variety to them. This can be broken down into several
+important factors: What programming paradigms are best supported? How
+does it apply types to data? What is its syntax like? How
+comprehensive is its standard library? While these will not suffice to
+give a full picture of a language, they can go a long way towards
+helping to characterize it.
+
+\subsection{Programming Paradigms}
+
+The most commonly referenced paradigms in modern programming languages
+are imperative, object-oriented and functional. Imperative programming
+centers around lists of commands that are fed into the computer in
+order, with these commands modifying the program's internal stat until
+it has arrived at the correct result. These instruction lists are
+divided into functions, which can pass data between each other
+throughout the course of the program. This style is commonly used both
+because it makes intuitive sense for the human user and because,
+beneath all the layers of abstraction, this is how computers really
+operate. Thus, in the hands of a skilled programmer, imperative
+languages offer the best level of control available over the
+machine. Some language designers, however, wanted code constructs to
+map more naturally to real-world concepts, so they created other
+paradigms for languages to work with.
+
+Object oriented programming is a more modern branch of imperative
+programming with the focus on self-contained, modular units called
+objects. These objects are collections of data passed around by the
+program, as well as functions that can be called on the object. The
+object oriented style has been used in procedural languages for
+decades, however some feel that this style is important enough to be
+given special significance in the language itself. Others are of the
+opinion that since object orientation can be achieved efficiently in
+procedural languages, incorporating the style into a language's syntax
+is overstepping the bounds of the language.
+
+Functional programming is a departure from the procedural style in
+which side effects should theoretically not be present: when a
+function is called with the same value, it should always return the
+same result, and it should not change anything else in the process. On
+the one hand, this allows pieces of a program to be better understood
+on their own: when functions cannot modify anything outside of their
+own existence, it becomes less necessary to understand the entire
+system in order to understand a part of it. On the other hand, not
+everything can be shoehorned into a side-effect-free existence:
+communicating with the outside world is itself a side-effect, so
+breaking the ``purity'' of a program will always be necessary at some
+point for the program to do anything at all.
+
+For Terse, I chose a simple procedural syntax as it is simple for both
+humans and computers to understand, without unnecessarily limiting
+programmers to a certain subset of the computer's capabilities. Much
+of this is personal preference: I dislike language designers assuming
+they know my problems better than I do, and much prefer systems that
+give me enough tools to solve my specific problem satisfactorily over
+systems that sacrifice flexibility under the pretense of providing the
+most common operations built-in.
+
+\subsection{Type Systems}
+
+A persistent problem in programming languages is identifying what a
+given piece of data represents. This can range from the micro level
+(differentiating between a bit of text and a number in memory) to
+larger applications (complex data structures). Programming languages
+are divided in how they handle this problem between untyped, weakly
+typed, and strongly typed languages. Untyped languages do not keep
+track of data types at all, instead leaving this job entirely to the
+programmer. This technique is not commonly used as it is almost
+comically error-prone even for small projects, and as the project
+grows understanding or changing it quickly becomes impossible. Weakly
+typed languages keep track of variable types but allow the programmer
+considerable leeway in converting between types: multiplying a string
+by a three, for instance, may return the string repeated three times,
+or it may simply return garbage from trying to turn the text's
+internal data into a number. Strongly typed systems track types
+strictly and do not allow implicit conversion between them; the
+programmer must indicate these conversions themselves. While less
+error-prone, this also makes coding slower. Which system is better is
+a strong case of personal preference.
+
+A separate but related concept to typing strength is static versus
+dynamic typing. In static typing, the types of variables must be
+stated explicitly by the programmer, while in dynamic typing, the
+types of variables and arguments are discovered at runtime. Static
+typing carries an advantage in speed: if a compiler knows exactly what
+operations will be used based on the provided type declarations, it
+can produce faster code than a compiler that must generate generic
+code to be used at runtime. Static type declarations can also aid
+programmers in figuring out the intended meaning of a program, as well
+as to notify them when they're using a function in a way that wasn't
+intended. Dynamic typing, on the other hand, has an advantage in not
+cluttering up code with information not relating to the logic itself,
+as well as being able to more concisely describe generic interfaces.
+
+Terse uses a strong, dynamic type system mostly consisting of Common
+Lisp's, the language that Terse is implemented in. Converting between
+types mostly has to be done manually with conversion functions defined
+in the standard library. Terse will not provide optional type
+declarations as their primary utility is in performance tuning, and
+the interpreter is not nearly sophisticated enough to take advantage
+of this.
+
+\todo[noinline]{need a section Design or somesuch}
+
+\subsection{Syntax}
+
+Terse's syntax is primarily based around statements classified by
+single-character identifiers and connected by the dot operator. All
+statements evaluate to a value that can then be used in other
+expressions, though that value can be nil. Variables are defined with
+the letter v, the variable name, a dot, and its intended value,
+eg. \code{vfoo.5} would declare a variable foo with the value
+\code{5}. If statements are indicated with \code{i} and take a boolean
+statement and a block to execute if the statement is true. Else
+statements, when they occur, must come immediately after a preceding
+if or else statement, and can either have another boolean expression
+or be empty. While loops are written with \code{w} and a conditional,
+and the body will keep evaluating while the conditional is true. In
+addition, loops in the style of C's for loops can be written as
+\code{w.(init),(endcheck),(step) \bs block\bs}. As somewhat alluded to
+in the previous example, statements can be parenthesized within
+enclosing statements; this is sometimes necessary to do so in order to
+achieve the desired nesting effect.
+
+Functions are defined with \code{f}, followed by the function's name,
+an optional argument list, and its body. Blocks are denoted with
+\code{\bs \bs}, with the target statements in between. The last
+statement's return value will also serve as the value of the block,
+which in the case of functions and control structures will be their
+return values as well. Function, as well as variable, names are
+case-insensitive. Functions are called with \code{c}, followed by a
+dot and the function's arguments. Further arguments are separated by
+commas. This creates a significant problem with statements like this:
+\code{cfoo.cbar.1,2}. The third argument (\code{2}) could be passed
+either to the call to bar or to foo, and there is no obvious way to
+tell which. Terse's solution is to parse arguments greedily by
+default, so the \code{2} would be associated with the call to
+bar. This can be overridden by parenthesizing \code{cbar.1}, in which
+case it would be foo called with two arguments.
+
+Literals can be of integers, floating-point numbers, and strings, with
+each of these behaving about as expected.  Array literals are written
+with bracketed space-separated lists, which can be filled with either
+literals or more dynamic expressions. Arrays are indexed by calling
+them like a function. Strings are a specialization of arrays
+containing only characters (denoted with single quotes). Arrays and
+strings are mutable, and their values are accessible by ``calling''
+them like a function. Their members can be changed like so:
+\code{v(carray.5).7}. Hash tables can be created with the
+standard-library ``makehash'' function, and accessed by calling the
+hash.
+
+\subsection{Standard Library}
+
+The Terse standard library is fairly basic, consisting mostly of
+functions for input, output and type conversion. IO targeting both the
+console and files is supported. Network operations, GUI programming,
+and most anything else are not. If I were to evolve Terse into a real
+language, a lot of additional functionality would be required, but as
+it stands the below standard functions are sufficient:
+
+\begin{table}
+  \begin{tabular}{ | l | l | }
+    \hline
+    Function & Explanation \\
+    \hline \hline
+    \code{print.msg}				& Prints text out to the console		\\ \hline
+    \code{println.msg}				& Message, plus a newline				\\ \hline
+    \code{readchar.msg}				& Reads a character of text from input	\\ \hline
+    \code{openfile.filename}		& Opens a file							\\ \hline
+    \code{readfilechar.filename}	& Reads a character from the given file	\\ \hline
+    \code{readfileline.filename}	& Likewise by line						\\ \hline
+    \code{writefile.text,filename}	& Writes the given text to the file		\\ \hline
+    \code{floor.num}				& Rounds a number down					\\ \hline
+    \code{ceil.num}					& Rounds a number up					\\ \hline
+    \code{round.num}				& Rounds a number						\\ \hline
+    \code{makehash}					& Creates a hash table					\\ \hline
+  \end{tabular}
+  \caption{Terse builtin functions}
+\end{table}
+
+Much of the overhead of creating a new language (nowadays, at least)
+is in writing a complete, robust standard library to allow programmers
+to focus more on their specific problem than the general ones along
+the way. Languages with a specific focus will design their standard
+library to support it, and general-purpose languages usually make
+their standard libraries extensive enough that they can stand without
+third-party support. Terse, as a purely academic language, doesn't
+require these additions, nor would they significantly contribute to
+its quality if they were added. Its standard library requirement
+starts and ends at providing just enough interactivity to verify that
+the program is doing the right thing, and that requirement is
+satisfied.
+
+\section{Implementation}
+
+The Terse interpreter is, as far as language implementations go, quite
+small and lightweight, largely by virtue of being hosted by a system
+that already implements a robust type system, first-class functions,
+and several other features that make language implementation
+comparatively easy. The interpreter is written in Common Lisp and
+weighs in at about 600 lines of code. It is split into two components:
+the parser translates text from a file into something usable by the
+program, and the runtime assembles this parse tree into nested
+function calls that, when run, execute the target program. This
+structure is fairly common for interpreted programming languages,
+though in my case both the language's design and implementation are
+radically simpler than what is found even in minimalist real-world
+interpreters.
+
+\subsection{The Parser}
+
+The purpose of the parser is to transform a textual program into a
+tree readable by the interpreter. It does this by reading the program
+text in and, statement by statement, outputting the statement's
+equivalent tree form. This parse tree is then handed off to the
+runtime to interpret as it sees fit; this division of labor makes both
+parts much easier to deal with than if the interpreter itself was
+parsing text on the go. This is the only real 'subsystem division'
+that Terse has.
+
+Parsing for most languages takes place in two steps: the lexer and the
+parser proper. The lexer splits the text stream into a sequential list
+of tokens, and the parser interprets these to build a tree more
+representative of the program's structure. Languages which rely
+significantly on context to determine a statement's meaning will
+commonly use a lexer to help deal with the potential ambiguity. There
+are even lexer generators available that will automatically generate
+the correct lexing code given a language description, such as GNU
+Flex. In Terse's case, however, the grammar is unambiguous and easy to
+process--I designed it emphasizing this over readability--so a
+separate parser, much less a parser generator, would be overkill.
+
+The parser exists to take a linear program input (be it a lexer output
+or plaintext) and turns it into an Abstract Syntax Tree--a recursive
+structure more representative of the meaning of the program, and more
+suited to processing by a subsequent compiler or interpreter. They
+work by grabbing one token at a time from the input stream while
+maintaining a program state to determine where in the tree the token
+will be put. For example, a parser for a calculator program would
+transfer the sequence $5 + 3 * 2$ into \code{[+ 5 [* 3 2]]} taking
+into account order of operations. Other statement types are likewise
+transformed, and the end result is a recursive list that can be
+transformed into a runnable program by a subsequent compiler or
+interpreter.
+
+Like the lexing step, there are programs available that will
+automatically generate a parser given a language definition; many
+parser programs are designed to be easily chainable with an automated
+lexing step (GNU Bison, for example, plays nicely with both Flex and
+Yacc). These are especially useful for programming languages that rely
+heavily on context for a token's meaning. A C-like grammar, for
+example, needs to differentiate between a type declaration, a function
+declaration and a function call without differentiators in the token
+itself, and parser generators have generally evolved to suit this
+need. Terse, however, is designed to be free of such ambiguities, and
+furthermore is written in a different language than any major parser
+generator targets. It was thus easiest to implement a parser myself.
+
+\begin{figure}
+\begin{verbatim}
+(defun parse (stream)
+  "Dispatch function for all the other parsing funcs"
+  (parse-whitespace stream)
+  (let ((char (peek-char nil stream nil nil)))
+    (case char
+         (#\f (parse-defun stream))
+         (#\v (parse-variable stream))
+         (#\c (parse-funcall stream))
+         (#\i (parse-if-statement stream))
+         (#\w (parse-while-statement stream))
+         (#\" (parse-string stream))
+         (#\[ (parse-array stream))
+         (#\( (parse-parened stream))
+         (t
+          (cond
+            ((eql char nil) nil)
+            ((digit-char-p char)
+             (parse-number stream))
+            (t (error (format nil "Parse failed at line ~a: ~a"
+                              *current-line* char))))))))
+\end{verbatim}
+\caption{Source code for Terse's parser dispatch}
+\end{figure}
+
+The Terse parser is centered around a single top-level function,
+\code{PARSE}, which dispatches to other parsing functions based on the
+first character of the statement. The delegate then returns a tree
+representation of the target statement, calling \code{PARSE}
+recursively on its components as appropriate. The structure of the
+delegate functions is generally to read the selector character off the
+stream, parse leading whitespace, and create a list of whatever
+properties the expression has. Parsing a function call, for example,
+involves reading the target function's name off the input stream and
+calling \code{PARSE} on any arguments it is called with.
+
+\begin{figure}
+\begin{verbatim}
+(defun parse-funcall (stream)
+  "Parses a function call and its arguments"
+  (read-char stream) (parse-whitespace stream)
+  `(:funcall (:name . ,(eat-name stream))
+             ,@(when (has-argument stream)
+                     `((:args . ,(parse-arguments stream))))))
+\end{verbatim}
+\caption{The parsing function for Terse function calls}
+\end{figure}
+The output of this function when called with \code{cprint.``Hello
+  World!''} would be \code{(:funcall (:name . “print”) (:args ``Hello
+  World!''))}. Other parsing functions vary in specifics, but their
+operations are basically the same. Running multiple statements is
+specified by \code{(:progn exprs...)} and is used both in block
+structures and in the file's top level. The file is processed by
+simply calling PARSE until the parser hits end-of-file, at which point
+the
+
+The parser is not without its bits of messiness; there are several
+components that could do with some improving. The dispatch function,
+for example, is currently a static list but would be better off as a
+more automatic dispatch mechanism, similar to the selector I used in
+the runtime component. Though the example I chose uses a list literal
+and inserts the relevant code from there, most of the other functions
+build the lists manually, a messy and unnecessary technique. Lastly,
+\code{PARSE-BLOCK} should be reachable from the main dispatch
+function, not called specially by the control structures; this would
+allow additional lexical scopes to be inserted anywhere, not just with
+control structures.
+
+\subsection{The Runtime}
+
+The Terse runtime consists of functions to transform the Abstract
+Syntax Tree into something runnable, manipulate the symbol table and
+deal with Terse values. The transformation consists of a top-level
+function \code{COMPILE} which returns a function that, when called,
+executes the program. Symbol lookup is handled by a series of symbol
+tables, each containing a parent attribute; this provides a function's
+lexical scoping. Terse values are stored as a thin wrapper over Lisp's
+own type system, and are needed to provide for setting array values
+and the like. Together, these provide all the necessary tools to run a
+Terse program.
+
+The symbol table implementation is fairly simple. It uses a hash table
+bound to a global variable that stores string-indexed names, as well
+as an optional parent slot. When a symbol is looked up, the lookup
+function checks each level for a matching symbol name, returning the
+first one it finds. The setter function works similarly, except that
+it creates a new binding in the innermost level if an existing binding
+isn't found. Symbol levels are currently added on function calls,
+though a case could be made for adding them to any block structure.
+
+Terse's value storage is similarly simple. Normal values are contained
+within an instance of \code{VALUE}, which provides fairly little
+utility \todo{Rephrase}. Array values are represented as a subclass of
+\code{VALUE}, which is necessary to allow it to be ``called''. Array
+subscripts are represented by a different \code{VALUE} subclass which
+allows them to be used as lvalues (values on the left side of an
+assignment operator; assignment target).
+
+Terse's interpretation step relies on generating functions to execute
+each piece of the AST. This is done through the \code{COMPILE}
+function. \code{COMPILE} itself is a dispatch function that selects an
+applicable transformation based on the first item of the AST. Each of
+its delegates transforms its target into a lambda expression, which
+when called executes the intended statement and returns the desired
+value. The compiled forms of literals are simply lambdas that return
+their packed values, while the more complex statements perform
+variable lookups, conditional execution or the like.
+
+\begin{figure}
+\begin{verbatim}
+(defexpr :funcall stmt
+  (let ((args (mapcar #'compile (get-property :args stmt))))
+    (lambda ()
+      (with-symbol-level
+        (let ((symbol (lookup-symbol (get-property :name stmt)))
+              (args (mapcar #'funcall args)))
+          (if (typep symbol 'value)
+              (call-value symbol args)
+              (apply symbol args)))))))
+\end{verbatim}
+\caption{The transformation function for Terse function calls}
+\end{figure}
+
+This system is slow and lends itself poorly to optimization, but I
+went with it anyways because it offers an exceptionally clean
+implementation: each AST expression can be transformed one-to-one into
+a ``compiled'' expression and executed. In addition, this approach
+handles nesting more directly than a code-generation approach. Perhaps
+most importantly, it keeps the base language readily accessible: more
+complicated code generation techniques would involve a specially-made
+bridge to the host language--if it was available at all--whereas in my
+native closure technique the base runtime is always close at
+hand. This was a major factor in keeping the language implementation
+as short and simple as it is.
+
+Since processed Terse functions are essentially interchangable with
+Lisp's functions, builtin functions can be provided to Terse simply by
+assigning the desired Lisp function to Terse's symbol
+table. Supporting new datatypes is even easier: all that is needed are
+the functions to create and manipulate them, Lisp's dynamic type
+system takes care of the rest. A more extensive standard library
+implementation would ideally use definitions written in Terse for many
+of the functions, but as the language stands now that would only
+overcomplicate things. More generally, a mechanism to load other
+source files into a running program should be included, but isn't yet.
+
+\section{Conclusion}
+
+I chose to create a programming language to get an idea of the
+challenges involved with making one. In this, I succeeded: for all of
+Terse's inadequacies, it served as a demonstration of what's necessary
+to make a programming language work. It's not suited for real-world
+development, but it was never meant to be. At its primary purpose--to
+show what's involved in creating a programming language--it succeeded
+beautifully. It has provided me with experience and insight that will
+be invaluable for writing programs in the future, and especially in
+crafting programming languages.
+
+What if I were to continue with Terse, though? What features would I
+add to it to turn it into a useful language? First thing would be to
+fix closure support. Closures are an incredibly useful feature found
+widely in scripting and other high-level languages but rarely in the
+systems languages that are used for the majority of today's software
+development. Closures exist to provide a handy means of data transfer
+that is often much nicer than systems programming's
+alternatives\footnotemark{}. Closures are also very easy to implement
+in a language structured as Terse is: as every namespace is a distinct
+hash table, it is trivial to create a new symbol table with each
+function invocation, and to cache the current one with each function
+definition. With this simple addition, Terse would suddenly have a
+distinct advantage over even modern systems programming languages.
+
+\footnotetext{C and its ilk traditionally use structs and classes to
+  pass data between functions, whereas a closure is a nested function
+  referencing its outer function environment. The choice between them
+  is a polarizing issue, and both solutions have their applications,
+  but I usually prefer closures.}
+
+Improving the standard library is also a must. As it stands now, the
+standard library is barely adequate even for simple file IO, and is
+essentially unusable for anything beyond that. Beyond better file
+manipulation, 
+
+\end{document}
