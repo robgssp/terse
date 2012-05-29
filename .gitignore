@@ -1,4 +1,11 @@
 *~
 *\#*
 *.fasl
-*.{aux,fff,log,pdf,tdo,toc,ttt,log}
+*.aux
+*.fff
+*.log
+*.pdf
+*.tdo
+*.toc
+*.ttt
+*.log

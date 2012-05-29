@@ -4,4 +4,4 @@ fmap.fun,list\
                 cfun.clist.vcount
                 vcount.c+.vcount,1\\
 
-cmap.f.val\cprintln.vval\,[1 2 3 4 "Hi!"]
+cmap.f.val\cprintln.c+.1,vval\,[1 2 3 4]

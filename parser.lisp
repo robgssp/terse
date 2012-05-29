@@ -9,6 +9,27 @@
 
 (defvar *current-line* 1)
 
+(defun parse (stream)
+  "Dispatch function for all the other parsing funcs"
+  (parse-whitespace stream)
+  (let ((char (peek-char nil stream nil nil)))
+    (case char
+         (#\f (parse-defun stream))
+         (#\v (parse-variable stream))
+         (#\c (parse-funcall stream))
+         (#\i (parse-if-statement stream))
+         (#\w (parse-while-statement stream))
+         (#\" (parse-string stream))
+         (#\[ (parse-array stream))
+         (#\( (parse-parened stream))
+         (t
+          (cond
+            ((eql char nil) nil)
+            ((digit-char-p char)
+             (parse-number stream))
+            (t (error (format nil "Parse failed at line ~a: ~a"
+                              *current-line* char))))))))
+
 (defun skip-comment (stream)
   (peek-char #\Newline stream nil nil))
 
@@ -24,23 +45,18 @@
   "Checks whether the previous command has an args list"
   (eql (parse-whitespace stream) #\.))
 
-;; TODO: remove code duplication
-(defun eat-additional-arguments (stream)
-  "Returns comma-separated arguments after the initial one."
-  (parse-whitespace stream)
-  (let ((next-char (peek-char nil stream nil nil)))
-    (when (eql next-char #\,)
-      (read-char stream)
-      (cons (parse stream) (eat-additional-arguments stream)))))
-
 (defun parse-arguments (stream)
   "Returns a list of parsed arguments"
-  (parse-whitespace stream)
-  (let ((next-char (peek-char nil stream nil nil)))
-    (when (eql next-char #\.)
-      (read-char stream)
-      (cons (parse stream) (eat-additional-arguments stream)))))
-    
+  (labels ((eat-additional-arguments ()
+             (let ((parsed (parse stream)))
+               (cons parsed
+                     (when (eql (parse-whitespace stream) #\,)
+                       (read-char stream)
+                       (eat-additional-arguments))))))
+
+    (parse-whitespace stream) (read-char stream)
+    (eat-additional-arguments)))
+
 (defun char-to-num (char)
   "converts numeric character to number"
   (- (char-code char) (char-code #\0)))
@@ -102,11 +118,9 @@
 (defun parse-funcall (stream)
   "Parses a function call and its arguments"
   (read-char stream) (parse-whitespace stream)
-  (let* ((name (eat-name stream))
-         (ret (list :funcall (cons :name name))))
-    (when (has-argument stream)
-      (nconc ret (list (cons :args (parse-arguments stream)))))
-    ret))
+  `(:funcall (:name . ,(eat-name stream))
+             ,@(when (has-argument stream)
+                     `((:args . ,(parse-arguments stream))))))
 
 (defun parse-defun-arguments (stream)
   "Parses arguments for name binding"
@@ -151,7 +165,7 @@
   (read-char stream)
   (parse-if-body stream))
 
-;; Pretty simplistic atm, need to add quote escaping sometime in the future 
+;; Pretty simplistic atm, need to add quote escaping sometime in the future
 (defun parse-string (stream)
   "Reads in a string literal"
   (read-char stream)
@@ -172,9 +186,9 @@
     (parse-whitespace stream) (read-char stream)))
 
 (defun parse-while-statement (stream)
+  "Checks whether the following statements are in argument-form (For loop)
+or a single expr (While loop)"
   (read-char stream)
-  ; Checks whether the following statements are in argument-form (For loop)
-  ; or a single expr (While loop)
   (if (eql (parse-whitespace stream) #\.)
       (let ((args (parse-arguments stream)))
         (destructuring-bind (init test step) args
@@ -182,28 +196,6 @@
                 (cons :step step) (cons :body (parse-block stream)))))
       (list :while (cons :test (parse stream))
             (cons :body (parse-block stream)))))
-
-(defun parse (stream)
-  "Dispatch function for all the other parsing funcs"
-  (parse-whitespace stream)
-  (let ((char (peek-char nil stream nil nil)))
-    (case char
-         (#\f (parse-defun stream))
-         (#\v (parse-variable stream))
-         (#\c (parse-funcall stream))
-         (#\i (parse-if-statement stream))
-         (#\w (parse-while-statement stream))
-         (#\" (parse-string stream))
-         (#\. (parse-arguments stream))
-         (#\[ (parse-array stream))
-         (#\( (parse-parened stream))
-         (t
-          (cond
-            ((eql char nil) nil)
-            ((and (characterp char) (digit-char-p char))
-             (parse-number stream))
-            (t (error (format nil "Parse failed at line ~a: ~a"
-                              *current-line* char))))))))
 
 (defun parse-stream (stream)
   "The top-level parsing function"

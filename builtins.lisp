@@ -25,11 +25,12 @@
     (format s "[~{~a~^ ~}]" (mapcar #'to-string (value val)))))
 
 (setf (lookup-symbol "print")
-      (lambda (obj)
-        (princ (to-string val) val)))
+      (lambda (val)
+        (princ (to-string val))
+        val))
 
 (defbuiltin "println" (obj)
-  (terse-print obj) (format t "~%")
+  (funcall (lookup-symbol "print") obj) (format t "~%")
   obj)
 
 (defbuiltin "getc" () (read-char))

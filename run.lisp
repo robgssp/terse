@@ -1,9 +1,12 @@
 #!/usr/bin/sbcl --script
 
-(require 'asdf)
-(require 'terse)
+(with-output-to-string (*standard-output*)
+  (require 'asdf)
+  (require 'terse))
 
 (defun main ()
-  (terse::main (elt sb-ext:*posix-argv* 1)))
+  (if (< (length sb-ext:*posix-argv*) 2)
+      (format t "No file specified.")
+      (terse::main (elt sb-ext:*posix-argv* 1))))
 
 (main)

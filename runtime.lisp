@@ -8,13 +8,6 @@
 (defvar *symbols* (make-hash-table :test 'equal)
   "The current symbol table")
 
-(defmacro with-symbol-level (&body body)
-  (let ((oldhash (gensym)))
-    `(let ((*symbols* (make-hash-table :test 'equal))
-           (,oldhash *symbols*))
-       (setf (gethash :parent *symbols*) ,oldhash)
-       ,@body)))
-
 ;(defmacro with-symbol-body (&body body) body)
 
 (defun lookup-symbol (symbol)
@@ -40,6 +33,13 @@ if the binding already exists."
   "Sets a Terse symbol"
   (unless (set-existing-symbol val key)
     (setf (gethash key *symbols*) val)))
+
+(defmacro with-symbol-level (&body body)
+  (let ((oldhash (gensym)))
+    `(let ((*symbols* (make-hash-table :test 'equal))
+           (,oldhash *symbols*))
+       (setf (gethash :parent *symbols*) ,oldhash)
+       ,@body)))
 
 ;; Not much utility on its own, but useful for implementing mutable references,
 ;; etc.
@@ -85,7 +85,8 @@ if the binding already exists."
 
 (defmacro with-compiled-props (props statement &body body)
   `(let ,(mapcar #'(lambda (x)
-                     `(,x (compile (get-property ,(make-keyword x) ,statement)))) props)
+                     `(,x (compile (get-property ,(make-keyword x) ,statement))))
+                 props)
      ,@body))
 
 (defun add-match-expr (check body)
