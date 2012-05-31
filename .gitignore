@@ -9,3 +9,8 @@
 *.toc
 *.ttt
 *.log
+*.bbl
+*-blx.bib
+*.blg
+*.dvi
+*.run.xml
